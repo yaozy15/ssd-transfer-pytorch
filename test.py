@@ -25,12 +25,12 @@ parser.add_argument('--cuda', default=True, type=bool,
 parser.add_argument('--voc_root', default=VOC_ROOT, help='Location of VOC root directory')
 parser.add_argument('-f', default=None, type=str, help="Dummy arg so we can load in Jupyter Notebooks")
 args = parser.parse_args()
-
+'''
 if args.cuda and torch.cuda.is_available():
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
 else:
     torch.set_default_tensor_type('torch.FloatTensor')
-
+'''
 if not os.path.exists(args.save_folder):
     os.mkdir(args.save_folder)
 
@@ -94,4 +94,5 @@ def test_voc():
              thresh=args.visual_threshold)
 
 if __name__ == '__main__':
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     test_voc()

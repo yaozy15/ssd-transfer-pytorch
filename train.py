@@ -29,7 +29,7 @@ parser.add_argument('--dataset_root', default=VOC_ROOT,
                     help='Dataset root directory path')
 parser.add_argument('--basenet', default='vgg16_reducedfc.pth',
                     help='Pretrained base model')
-parser.add_argument('--batch_size', default=32, type=int,
+parser.add_argument('--batch_size', default=6, type=int,
                     help='Batch size for training')
 parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
@@ -53,7 +53,7 @@ parser.add_argument('--save_folder', default='weights/',
                     help='Directory for saving checkpoint models')
 args = parser.parse_args()
 
-
+'''
 if torch.cuda.is_available():
     if args.cuda:
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
@@ -63,7 +63,7 @@ if torch.cuda.is_available():
         torch.set_default_tensor_type('torch.FloatTensor')
 else:
     torch.set_default_tensor_type('torch.FloatTensor')
-
+'''
 if not os.path.exists(args.save_folder):
     os.mkdir(args.save_folder)
 
@@ -96,7 +96,8 @@ def train():
     net = ssd_net
 
     if args.cuda:
-        net = torch.nn.DataParallel(ssd_net)
+        #net = torch.nn.DataParallel(ssd_net).cuda()
+        net = ssd_net.cuda()
         cudnn.benchmark = True
 
     if args.resume:
@@ -148,6 +149,8 @@ def train():
                                   pin_memory=True)
     # create batch iterator
     batch_iterator = iter(data_loader)
+    len_train = len(batch_iterator)
+    print len_train
     for iteration in range(args.start_iter, cfg['max_iter']):
         if args.visdom and iteration != 0 and (iteration % epoch_size == 0):
             update_vis_plot(epoch, loc_loss, conf_loss, epoch_plot, None,
@@ -160,9 +163,14 @@ def train():
         if iteration in cfg['lr_steps']:
             step_index += 1
             adjust_learning_rate(optimizer, args.gamma, step_index)
-
+        if iteration % len_train == 0:
+            batch_iterator = iter(data_loader)
         # load train data
-        images, targets = next(batch_iterator)
+        #try:
+        images, targets = batch_iterator.next()
+        print len(targets), targets[0]
+        #except:
+        #    break
 
         if args.cuda:
             images = Variable(images.cuda())
@@ -173,6 +181,8 @@ def train():
         # forward
         t0 = time.time()
         out = net(images)
+        #out = out.cuda()
+        #targets = targets.cuda()
         # backprop
         optimizer.zero_grad()
         loss_l, loss_c = criterion(out, targets)
@@ -180,13 +190,13 @@ def train():
         loss.backward()
         optimizer.step()
         t1 = time.time()
-        loc_loss += loss_l.data[0]
-        conf_loss += loss_c.data[0]
+        loc_loss += loss_l.item()
+        conf_loss += loss_c.item()
 
         if iteration % 10 == 0:
             print('timer: %.4f sec.' % (t1 - t0))
-            print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.data[0]), end=' ')
-
+            print('iter ' + repr(iteration) + ' || Loss: %.4f ||' % (loss.item()))
+            print("train loss: {}".format(loss.data.item()))
         if args.visdom:
             update_vis_plot(iteration, loss_l.data[0], loss_c.data[0],
                             iter_plot, epoch_plot, 'append')
@@ -252,4 +262,5 @@ def update_vis_plot(iteration, loc, conf, window1, window2, update_type,
 
 
 if __name__ == '__main__':
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     train()
